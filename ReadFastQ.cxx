@@ -2,8 +2,98 @@
 #include <fstream>
 #include <string>
 #include <sstream>
-
+#include <cmath>
 #include "itkTimeProbe.h"
+
+
+class KMer
+{
+public:
+  KMer(int id)
+  {
+    iKMerSize = id;
+    AC_TG.resize(iKMerSize);
+    AT_CG.resize(iKMerSize);
+  }
+
+  KMer(std::string p)
+  {
+    iKMerSize = p.size();
+    AC_TG.resize(iKMerSize);
+    AT_CG.resize(iKMerSize);
+
+    for( unsigned int i = 0; i < iKMerSize; i++ )
+    {
+      switch(p[i])
+      {
+        case 'A' :
+          AC_TG[i] = 1;
+          AT_CG[i] = 1;
+          break;
+        case 'T' :
+          AC_TG[i] = 0;
+          AT_CG[i] = 1;
+          break;
+        case 'C' :
+          AC_TG[i] = 1;
+          AT_CG[i] = 0;
+          break;
+        case 'G' :
+          AC_TG[i] = 0;
+          AT_CG[i] = 0;
+      }
+    }
+  }
+
+  ~KMer()
+  {
+    AC_TG.clear();
+    AT_CG.clear();
+  }
+
+  const std::string GetNTide()
+  {
+    std::string p;
+    p.reserve( iKMerSize );
+    for( unsigned int i = 0; i < iKMerSize; i++ )
+    {
+      switch( 2 * int(AC_TG[i]) + AT_CG[i] )
+      {
+        case 3 :
+          p.insert( i, 1, 'A' );
+          break;
+        case 2 :
+          p.insert( i, 1, 'C' );
+          break;
+        case 1 :
+          p.insert( i, 1, 'T' );
+          break;
+        case 0 :
+          p.insert( i, 1, 'G' );
+      }
+    }
+
+    return p;
+  }
+
+  bool operator <(const KMer& rhs) const
+  {
+    for( int i = 0; i < iKMerSize; i++ )
+    {
+      if ( 2 * int(AC_TG[i]) + AT_CG[i]  < 2 * int(rhs.AC_TG[i]) + rhs.AT_CG[i] )
+      {
+        return true;
+      }
+    }
+    return false;
+  }
+
+private:
+  int iKMerSize;
+  std::vector<bool> AC_TG; // A (3) or C (2)
+  std::vector<bool> AT_CG; // T (1) or G (0)
+};
+
 
 int main ( int argc, char* argv[] )
 {
@@ -14,10 +104,8 @@ int main ( int argc, char* argv[] )
     return EXIT_FAILURE;
   }
 
-  typedef std::pair<std::string,unsigned int> PairType;
-  typedef std::map<std::string, unsigned int> MapType;
-  typedef MapType::const_iterator MapIteratorType;
-  typedef std::pair<MapIteratorType,bool> MapInsertReturnType;
+  typedef std::map<KMer, unsigned int> KMerMapType;
+  typedef KMerMapType::iterator KMerMapIteratorType;
 
   unsigned int iKMerSize = atoi( argv[2] );
   unsigned int iTopCount = atoi( argv[3] );
@@ -42,7 +130,7 @@ int main ( int argc, char* argv[] )
     std::cout << "iTopCount size needs to be larger than 0" << std::endl;
   }
 
-  MapType KMerCounter;
+  KMerMapType KMerCounter;
   std::string line, kmer;
   std::fstream inFile( argv[1], std::ios::in );
 
@@ -74,8 +162,8 @@ int main ( int argc, char* argv[] )
       {
         for( unsigned int i = 0; i < len - iKMerSize; i++ )
         {
-          kmer = line.substr( i, iKMerSize);
-          KMerCounter[kmer]++;
+          KMer km( line.substr( i, iKMerSize) );
+          KMerCounter[km]++;
         }
       }
 
@@ -115,7 +203,8 @@ int main ( int argc, char* argv[] )
 
       while ( ( ch != '\n' ) && ( !inFile.eof() ) )
       {
-        KMerCounter[kmer]++;
+        KMer km(kmer);
+        KMerCounter[km]++;
 
         // Read next character
         ch = inFile.get();
@@ -123,7 +212,7 @@ int main ( int argc, char* argv[] )
         // Move everything in the string up by one character
         // Append last character
         std::string ss(1, ch);
-        kmer = kmer.substr(1,iKMerSize-1) + ss;
+        kmer = kmer.substr(1, iKMerSize-1) + ss;
       }
 
       // Read third line -- usually small
@@ -156,9 +245,10 @@ int main ( int argc, char* argv[] )
   // Print out the top counts
   unsigned int count = 0;
   std::cout << "Top " << iTopCount << " K-Mers are: " << std::endl;
-  for (MapIteratorType iter = KMerCounter.begin(); count < iTopCount; iter++)
+  for (KMerMapIteratorType iter = KMerCounter.begin(); count < iTopCount; iter++)
   {
-    std::cout << iter->first << ' ' << iter->second << std::endl;
+    KMer km = iter->first;
+    std::cout << km.GetNTide() << ' ' << iter->second << std::endl;
     count++;
   }
 
