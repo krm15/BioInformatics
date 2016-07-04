@@ -12,43 +12,45 @@ public:
   KMer(int id)
   {
     iKMerSize = id;
-    AC_TG.resize(iKMerSize);
-    AT_CG.resize(iKMerSize);
+    AC_GT.resize(iKMerSize);
+    AG_CT.resize(iKMerSize);
   }
 
   KMer(std::string p)
   {
     iKMerSize = p.size();
-    AC_TG.resize(iKMerSize);
-    AT_CG.resize(iKMerSize);
+    AC_GT.resize(iKMerSize);
+    AG_CT.resize(iKMerSize);
 
     for( unsigned int i = 0; i < iKMerSize; i++ )
     {
       switch(p[i])
       {
         case 'A' :
-          AC_TG[i] = 1;
-          AT_CG[i] = 1;
-          break;
-        case 'T' :
-          AC_TG[i] = 0;
-          AT_CG[i] = 1;
+          AC_GT[i] = 0;
+          AG_CT[i] = 0;
           break;
         case 'C' :
-          AC_TG[i] = 1;
-          AT_CG[i] = 0;
+          AC_GT[i] = 0;
+          AG_CT[i] = 1;
           break;
         case 'G' :
-          AC_TG[i] = 0;
-          AT_CG[i] = 0;
+          AC_GT[i] = 1;
+          AG_CT[i] = 0;
+          break;
+        case 'T' :
+          AC_GT[i] = 1;
+          AG_CT[i] = 1;
+          break;
+
       }
     }
   }
 
   ~KMer()
   {
-    AC_TG.clear();
-    AT_CG.clear();
+    AC_GT.clear();
+    AG_CT.clear();
   }
 
   const std::string GetNTide()
@@ -57,19 +59,20 @@ public:
     p.reserve( iKMerSize );
     for( unsigned int i = 0; i < iKMerSize; i++ )
     {
-      switch( 2 * int(AC_TG[i]) + AT_CG[i] )
+      switch( 2 * int(AC_GT[i]) + AG_CT[i] )
       {
-        case 3 :
+        case 0 :
           p.insert( i, 1, 'A' );
           break;
-        case 2 :
+        case 1 :
           p.insert( i, 1, 'C' );
           break;
-        case 1 :
+        case 2 :
+          p.insert( i, 1, 'G' );
+          break;
+        case 3 :
           p.insert( i, 1, 'T' );
           break;
-        case 0 :
-          p.insert( i, 1, 'G' );
       }
     }
 
@@ -80,9 +83,13 @@ public:
   {
     for( int i = 0; i < iKMerSize; i++ )
     {
-      if ( 2 * int(AC_TG[i]) + AT_CG[i]  < 2 * int(rhs.AC_TG[i]) + rhs.AT_CG[i] )
+      if ( 2 * int(AC_GT[i]) + AG_CT[i] < 2 * int(rhs.AC_GT[i]) + rhs.AG_CT[i] )
       {
         return true;
+      }
+      else if ( 2 * int(AC_GT[i]) + AG_CT[i] > 2 * int(rhs.AC_GT[i]) + rhs.AG_CT[i] )
+      {
+        return false;
       }
     }
     return false;
@@ -90,8 +97,8 @@ public:
 
 private:
   int iKMerSize;
-  std::vector<bool> AC_TG; // A (3) or C (2)
-  std::vector<bool> AT_CG; // T (1) or G (0)
+  std::vector<bool> AC_GT; // A (0) or C (1)
+  std::vector<bool> AG_CT; // G (2) or T (3)
 };
 
 
