@@ -12,15 +12,21 @@ public:
   KMer(int id)
   {
     iKMerSize = id;
-    AC_GT.resize(iKMerSize);
-    AG_CT.resize(iKMerSize);
+    AC_GT = new bool[iKMerSize];
+    AG_CT = new bool[iKMerSize];
+
+    //AC_GT.resize(iKMerSize);
+    //AG_CT.resize(iKMerSize);
   }
 
   KMer(std::string p)
   {
     iKMerSize = p.size();
-    AC_GT.resize(iKMerSize);
-    AG_CT.resize(iKMerSize);
+    AC_GT = new bool[iKMerSize];
+    AG_CT = new bool[iKMerSize];
+
+    //AC_GT.resize(iKMerSize);
+    //AG_CT.resize(iKMerSize);
 
     for( unsigned int i = 0; i < iKMerSize; i++ )
     {
@@ -41,16 +47,17 @@ public:
         case 'T' :
           AC_GT[i] = 1;
           AG_CT[i] = 1;
-          break;
-
       }
     }
   }
 
   ~KMer()
   {
-    AC_GT.clear();
-    AG_CT.clear();
+    //AC_GT.clear();
+    //AG_CT.clear();
+
+    //delete[] AC_GT;
+    //delete[] AG_CT;
   }
 
   const std::string GetNTide()
@@ -81,7 +88,7 @@ public:
 
   bool operator <(const KMer& rhs) const
   {
-    for( int i = 0; i < iKMerSize; i++ )
+    for( unsigned int i = 0; i < iKMerSize; i++ )
     {
       if ( 2 * int(AC_GT[i]) + AG_CT[i] < 2 * int(rhs.AC_GT[i]) + rhs.AG_CT[i] )
       {
@@ -96,9 +103,9 @@ public:
   }
 
 private:
-  int iKMerSize;
-  std::vector<bool> AC_GT; // A (0) or C (1)
-  std::vector<bool> AG_CT; // G (2) or T (3)
+  unsigned char iKMerSize;
+  bool *AC_GT; // A (0) or C (1)
+  bool *AG_CT; // G (2) or T (3)
 };
 
 
@@ -150,6 +157,8 @@ int main ( int argc, char* argv[] )
     return EXIT_FAILURE;
   }
 
+  unsigned int cc = 0;
+
   unsigned int len;
 
   if ( ! iLargeRead )
@@ -157,6 +166,12 @@ int main ( int argc, char* argv[] )
     // Use unordered maps for small reads
     while( !inFile.eof() )
     {
+      if ( cc%100000 == 0 )
+      {
+        std::cout << cc/100000 << std::endl;
+      }
+      cc++;
+
       std::getline(inFile, line);
       //std::cout << line << std::endl;
 
@@ -171,6 +186,7 @@ int main ( int argc, char* argv[] )
         {
           KMer km( line.substr( i, iKMerSize) );
           KMerCounter[km]++;
+          //std::cout << km.GetNTide() << ' ' << KMerCounter.size() << std::endl;
         }
       }
 
@@ -237,7 +253,7 @@ int main ( int argc, char* argv[] )
   }
 
   inFile.close();
-  std::cout << "Finished reading file" << std::endl;
+  std::cout << "Finished reading file " << cc << std::endl;
 
   cputimer.Stop();
   std::cout << "Reading took " << cputimer.GetMean() << " seconds" << std::endl;
@@ -257,6 +273,14 @@ int main ( int argc, char* argv[] )
     KMer km = iter->first;
     std::cout << km.GetNTide() << ' ' << iter->second << std::endl;
     count++;
+  }
+
+  KMerMapIteratorType iter = KMerCounter.begin();
+  while ( iter != KMerCounter.end() )
+  {
+    KMerMapIteratorType toErase = iter;
+    ++iter;
+    KMerCounter.erase(toErase);
   }
 
   return EXIT_SUCCESS;
