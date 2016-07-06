@@ -6,107 +6,83 @@
 #include "itkTimeProbe.h"
 
 
-class KMer
+std::string GetString( size_t val, unsigned int iKMerSizep )
 {
-public:
-  KMer(int id)
+  std::string s;
+  s.reserve( iKMerSizep );
+
+  unsigned int rem;
+
+  for( unsigned int i = 0; i < iKMerSizep; i++ )
   {
-    iKMerSize = id;
-    AC_GT = new bool[iKMerSize];
-    AG_CT = new bool[iKMerSize];
+    rem = val%4;
+    val = val/4;
 
-    //AC_GT.resize(iKMerSize);
-    //AG_CT.resize(iKMerSize);
-  }
-
-  KMer(std::string p)
-  {
-    iKMerSize = p.size();
-    AC_GT = new bool[iKMerSize];
-    AG_CT = new bool[iKMerSize];
-
-    //AC_GT.resize(iKMerSize);
-    //AG_CT.resize(iKMerSize);
-
-    for( unsigned int i = 0; i < iKMerSize; i++ )
+    switch( rem )
     {
-      switch(p[i])
-      {
-        case 'A' :
-          AC_GT[i] = 0;
-          AG_CT[i] = 0;
-          break;
-        case 'C' :
-          AC_GT[i] = 0;
-          AG_CT[i] = 1;
-          break;
-        case 'G' :
-          AC_GT[i] = 1;
-          AG_CT[i] = 0;
-          break;
-        case 'T' :
-          AC_GT[i] = 1;
-          AG_CT[i] = 1;
-      }
+      case 0 :
+        s.insert( iKMerSizep-1-i, 1, 'A' );
+        break;
+      case 1 :
+        s.insert( iKMerSizep-1-i, 1, 'C' );
+        break;
+      case 2 :
+        s.insert( iKMerSizep-1-i, 1, 'G' );
+        break;
+      case 3 :
+        s.insert( iKMerSizep-1-i, 1, 'T' );
+        break;
     }
   }
 
-  ~KMer()
-  {
-    //AC_GT.clear();
-    //AG_CT.clear();
+  return s;
+}
 
-    //delete[] AC_GT;
-    //delete[] AG_CT;
-  }
-
-  const std::string GetNTide()
+size_t GetIndex( std::string kmer, unsigned int iKMerSizep )
+{
+  size_t s = 0;
+  unsigned int val;
+  for( unsigned int i = 0; i < iKMerSizep; i++ )
   {
-    std::string p;
-    p.reserve( iKMerSize );
-    for( unsigned int i = 0; i < iKMerSize; i++ )
+    switch(kmer[i])
     {
-      switch( 2 * int(AC_GT[i]) + AG_CT[i] )
-      {
-        case 0 :
-          p.insert( i, 1, 'A' );
-          break;
-        case 1 :
-          p.insert( i, 1, 'C' );
-          break;
-        case 2 :
-          p.insert( i, 1, 'G' );
-          break;
-        case 3 :
-          p.insert( i, 1, 'T' );
-          break;
-      }
+      case 'A' :
+        val = 0;
+        break;
+      case 'C' :
+        val = 1;
+        break;
+      case 'G' :
+        val = 2;
+        break;
+      case 'T' :
+        val = 3;
+        break;
+      default :
+        val = 0;
     }
 
-    return p;
+    s += size_t(pow(4, iKMerSizep-1-i)) * val;
   }
 
-  bool operator <(const KMer& rhs) const
-  {
-    for( unsigned int i = 0; i < iKMerSize; i++ )
-    {
-      if ( 2 * int(AC_GT[i]) + AG_CT[i] < 2 * int(rhs.AC_GT[i]) + rhs.AG_CT[i] )
-      {
-        return true;
-      }
-      else if ( 2 * int(AC_GT[i]) + AG_CT[i] > 2 * int(rhs.AC_GT[i]) + rhs.AG_CT[i] )
-      {
-        return false;
-      }
-    }
-    return false;
-  }
+  return s;
+}
 
-private:
-  unsigned char iKMerSize;
-  bool *AC_GT; // A (0) or C (1)
-  bool *AG_CT; // G (2) or T (3)
-};
+
+template<typename A, typename B>
+std::pair<B,A> flip_pair(const std::pair<A,B> &p)
+{
+    return std::pair<B,A>(p.second, p.first);
+}
+
+template<typename A, typename B>
+std::multimap<B,A> flip_map(const std::map<A,B> &src)
+{
+    std::multimap<B,A> dst;
+    std::transform(src.begin(), src.end(), std::inserter(dst, dst.begin()),
+                   flip_pair<A,B>);
+    return dst;
+}
 
 
 int main ( int argc, char* argv[] )
@@ -118,13 +94,16 @@ int main ( int argc, char* argv[] )
     return EXIT_FAILURE;
   }
 
-  typedef std::map<KMer, unsigned int> KMerMapType;
+  typedef std::map<std::string, unsigned int> KMerMapType;
   typedef KMerMapType::iterator KMerMapIteratorType;
+  typedef std::multimap<unsigned int, std::string> AccumulatorMapType;
+  typedef AccumulatorMapType::iterator AccumulatorMapIteratorType;
 
   unsigned int iKMerSize = atoi( argv[2] );
   unsigned int iTopCount = atoi( argv[3] );
 
   bool iLargeRead;
+  unsigned int PrefixLengthInPass = 2;
 
   // Determine this from computer memory and file size
   iLargeRead = false;
@@ -144,11 +123,15 @@ int main ( int argc, char* argv[] )
     std::cout << "iTopCount size needs to be larger than 0" << std::endl;
   }
 
-  KMerMapType KMerCounter;
+  size_t index;
+  unsigned int iKMerSizep = 0.5*(iKMerSize - PrefixLengthInPass);
+  unsigned int iKMerSizes = iKMerSize - PrefixLengthInPass - iKMerSizep;
+  size_t counterSize = size_t( pow(4, iKMerSizep) );
+
   std::string line, kmer;
   std::fstream inFile( argv[1], std::ios::in );
 
-  itk::TimeProbe cputimer;
+  itk::TimeProbe cputimer; 
   cputimer.Start();
 
   if( !inFile )
@@ -157,20 +140,22 @@ int main ( int argc, char* argv[] )
     return EXIT_FAILURE;
   }
 
-  unsigned int cc = 0;
+  AccumulatorMapType KMerCounterAccumulator;
 
   unsigned int len;
+  unsigned int numOfPasses =  int( pow(4, PrefixLengthInPass) );
 
-  if ( ! iLargeRead )
+  for( unsigned int pass = 0; pass < numOfPasses; pass++ )
   {
-    // Use unordered maps for small reads
+    KMerMapType *KMerCounter;
+    KMerCounter = new KMerMapType[ counterSize ];
+    unsigned int cc = 0;
     while( !inFile.eof() )
     {
       if ( cc%100000 == 0 )
       {
-        std::cout << cc/100000 << std::endl;
+        std::cout << cc/100000 << ' ' << KMerCounter[0].size() << std::endl;
       }
-      cc++;
 
       std::getline(inFile, line);
       //std::cout << line << std::endl;
@@ -184,9 +169,13 @@ int main ( int argc, char* argv[] )
       {
         for( unsigned int i = 0; i < len - iKMerSize; i++ )
         {
-          KMer km( line.substr( i, iKMerSize) );
-          KMerCounter[km]++;
-          //std::cout << km.GetNTide() << ' ' << KMerCounter.size() << std::endl;
+          //KMer km( line.substr( i, iKMerSize) );
+          if ( GetIndex(line.substr( i, PrefixLengthInPass), PrefixLengthInPass) == pass )
+          {
+            index = GetIndex( line.substr( i+PrefixLengthInPass, iKMerSizep), iKMerSizep );
+            KMerCounter[index][ line.substr( i+PrefixLengthInPass+iKMerSizep, iKMerSizes) ]++;//km
+            //std::cout << km.GetNTide() << ' ' << KMerCounter.size() << std::endl;
+          }
         }
       }
 
@@ -196,92 +185,73 @@ int main ( int argc, char* argv[] )
       {
         std::getline(inFile, line);
       }
+      cc++;
     }
-  }
-  else // For large reads
-  {
-    char ch;
-    kmer.reserve( iKMerSize );
 
-    while( !inFile.eof() )
+    // Merge KMerCounter and KMerCounterAccumuator
+    for(unsigned int i = 0; i < counterSize; i++)
     {
-      // Read first line -- usually small
-      std::getline(inFile, line);
+      AccumulatorMapType fKMerCounter = flip_map<std::string, unsigned int>( KMerCounter[i] );
+      KMerCounter[i].clear();
 
-      // Streaming read till end-of-line is encountered
-      for( unsigned int i = 0; i < iKMerSize-1; i++ )
+      // Retain iTopCount elements;
+      AccumulatorMapIteratorType it = fKMerCounter.begin();
+      unsigned int count = 0;
+      unsigned countLimit = iTopCount;
+
+      if ( countLimit > fKMerCounter.size() )
       {
-        if ( !inFile.eof() )
-        {
-          inFile >> ch;
-          kmer.insert( i, 1, ch );
-        }
+        countLimit = fKMerCounter.size();
       }
 
-      if ( !inFile.eof() )
+      while( count < countLimit )
       {
-        inFile >> ch;
-        kmer.insert( iKMerSize - 1, 1, ch );
+        count++;
+        ++it;
       }
+     fKMerCounter.erase( it, fKMerCounter.end() );
 
-      while ( ( ch != '\n' ) && ( !inFile.eof() ) )
+     std::string kmer = GetString( pass, PrefixLengthInPass ) +
+                        GetString( counterSize, iKMerSizep );
+
+     // Add to KMerCounterAccumulator
+      for (it=fKMerCounter.begin(); it!=fKMerCounter.end(); ++it)
       {
-        KMer km(kmer);
-        KMerCounter[km]++;
-
-        // Read next character
-        ch = inFile.get();
-
-        // Move everything in the string up by one character
-        // Append last character
-        std::string ss(1, ch);
-        kmer = kmer.substr(1, iKMerSize-1) + ss;
+        kmer += (*it).second;
+        KMerCounterAccumulator.insert( std::make_pair( (*it).first, kmer ) );
       }
-
-      // Read third line -- usually small
-      std::getline(inFile, line);
-
-      ch = '0';
-      // Read fourth line - streaming
-      while ( ( ch != '\n' ) && !inFile.eof() )
-      {
-        ch = inFile.get();
-      }
-
-      kmer.clear();
+      fKMerCounter.clear();
     }
+
+    AccumulatorMapIteratorType it = KMerCounterAccumulator.begin();
+    unsigned int count = 0;
+    unsigned int countLimit = iTopCount;
+
+    if ( countLimit > KMerCounterAccumulator.size() )
+    {
+      countLimit = KMerCounterAccumulator.size();
+    }
+
+    while( count < countLimit )
+    {
+      count++;
+      ++it;
+    }
+    KMerCounterAccumulator.erase( it, KMerCounterAccumulator.end() );
+
+    delete[] KMerCounter;
+
+    inFile.clear();
+    inFile.seekg(0, std::ios::beg);
   }
 
   inFile.close();
-  std::cout << "Finished reading file " << cc << std::endl;
+  std::cout << "Finished reading file " << std::endl;
+
+  // Write out the top 25 k-mers
 
   cputimer.Stop();
   std::cout << "Reading took " << cputimer.GetMean() << " seconds" << std::endl;
-
-  // Adjust iTopCount to the size of the map, only if its smaller
-  unsigned int size = KMerCounter.size();
-  if (size < iTopCount)
-  {
-    iTopCount = size;
-  }
-
-  // Print out the top counts
-  unsigned int count = 0;
-  std::cout << "Top " << iTopCount << " K-Mers are: " << std::endl;
-  for (KMerMapIteratorType iter = KMerCounter.begin(); count < iTopCount; iter++)
-  {
-    KMer km = iter->first;
-    std::cout << km.GetNTide() << ' ' << iter->second << std::endl;
-    count++;
-  }
-
-  KMerMapIteratorType iter = KMerCounter.begin();
-  while ( iter != KMerCounter.end() )
-  {
-    KMerMapIteratorType toErase = iter;
-    ++iter;
-    KMerCounter.erase(toErase);
-  }
 
   return EXIT_SUCCESS;
 }
