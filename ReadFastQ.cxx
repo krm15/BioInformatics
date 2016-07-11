@@ -135,6 +135,14 @@ std::multimap< B, A, std::greater<B> > flip_map(const std::map<A,B> &src)
 }
 
 
+// Function to return file size
+std::ifstream::pos_type filesize(const char* filename)
+{
+    std::ifstream in(filename, std::ifstream::ate | std::ifstream::binary);
+    return in.tellg();
+}
+
+
 int main ( int argc, char* argv[] )
 {
   // Start timer to measure performance
@@ -160,6 +168,7 @@ int main ( int argc, char* argv[] )
   // User-input parameter for number of k-mer candidates
   unsigned int iTopCount = atoi( argv[3] );
 
+  float FileSizeInMB = filesize( argv[1] )/1000000;
 
   if ( iKMerSize == 0 )
   {
@@ -190,13 +199,20 @@ int main ( int argc, char* argv[] )
   }
   else if ( ( iKMerSize > 16 ) && ( iKMerSize <= 25 ) )
   {
-    PassLength = 1;
     kMerSizePrefix = 14;
   }
   else
   {
-    PassLength = 2;
     kMerSizePrefix = 14;
+  }
+
+  if ( FileSizeInMB <= 5000 )
+  {
+        PassLength = 0;
+  }
+  else if ( ( FileSizeInMB > 5000 ) && ( FileSizeInMB <= 10000 ) )
+  {
+        PassLength = 1;
   }
 
   if ( argc > 4 )
@@ -219,10 +235,10 @@ int main ( int argc, char* argv[] )
 
   size_t index;
   std::string line, kMer, prefix, suffix, passprefix;
-  AccumulatorMapType KMerCounterAccumulator;
-  std::fstream inFile( argv[1], std::ios::in );
   unsigned int len, p;
+  AccumulatorMapType KMerCounterAccumulator;
 
+  std::fstream inFile( argv[1], std::ios::in );
   if( !inFile )
   {
     std::cout << "File not opened..." << std::endl;
