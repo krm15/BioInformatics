@@ -31,7 +31,7 @@
  ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 =========================================================================*/
-
+#include "KMerSource.h"
 #include <itkVector.h>
 #include <fstream>
 #include <string>
@@ -180,7 +180,7 @@ int main ( int argc, char* argv[] )
     PassLength = atoi( argv[4] );
   }
 
-  // Detemine prefix length and suffix length
+  // Detemine prefix length
   unsigned int kMerSizePrefix = 0.5*(iKMerSize - PassLength);
   if ( argc > 5 )
   {
@@ -189,18 +189,15 @@ int main ( int argc, char* argv[] )
 
   unsigned int kMerSizeSuffix = iKMerSize - PassLength - kMerSizePrefix;
 
-  //std::cout << "kMerSizePrefix: " << kMerSizePrefix << std::endl;
-  //std::cout << "kMerSizeSuffix: " << kMerSizeSuffix << std::endl;
-
   size_t counterSize(1);
   for( unsigned int j = 0; j < kMerSizePrefix; j++ )
   {
     counterSize *= 4;
   }
-  //std::cout << "Prefix size " << counterSize << std::endl;
 
   size_t index;
   std::string line, kMer, prefix, suffix, passprefix;
+  AccumulatorMapType KMerCounterAccumulator;
   std::fstream inFile( argv[1], std::ios::in );
   unsigned int len, p;
 
@@ -210,19 +207,14 @@ int main ( int argc, char* argv[] )
     return EXIT_FAILURE;
   }
 
-  AccumulatorMapType KMerCounterAccumulator;
-
   unsigned int numOfPasses(1);
   for( unsigned int j = 0; j < PassLength; j++ )
   {
     numOfPasses *= 4;
   }
-  //std::cout << "Number of passes " << numOfPasses << std::endl;
 
   for( unsigned int pass = 0; pass < numOfPasses; pass++ )
   {
-    //std::cout << "Pass: " << pass << std::endl;
-
     // Initialize an array of k-mers
     KMerMapType *KMerCounter;
     KMerCounter = new KMerMapType[ counterSize ];
@@ -230,11 +222,6 @@ int main ( int argc, char* argv[] )
     size_t readCounter(0);
     while( !inFile.eof() )
     {
-      if ( readCounter%100000 == 0 )
-      {
-        std::cout << readCounter/100000 << ' ' << KMerCounter[0].size() << std::endl;
-      }
-
       // Read in first two lines
       std::getline(inFile, line);
 
@@ -252,17 +239,12 @@ int main ( int argc, char* argv[] )
           passprefix = kMer.substr( 0, PassLength );
           p =  GetIndex( passprefix, PassLength );
 
-          //KMer km( line.substr( i, iKMerSize) );
           if ( p == pass )
           {
             prefix = kMer.substr( PassLength, kMerSizePrefix);
             index = GetIndex( prefix, kMerSizePrefix );
             suffix = kMer.substr( PassLength+kMerSizePrefix, kMerSizeSuffix);
-//            std::cout << i << " Kmer " << kMer << ' ' << passprefix << ' ' <<
-//                         p << ' ' << prefix << ' ' << index << ' ' << suffix << std::endl;
-
-            KMerCounter[index][suffix]++;//km
-            //std::cout << km.GetNTide() << ' ' << KMerCounter.size() << std::endl;
+            KMerCounter[index][suffix]++;
           }
         }
       }
@@ -281,11 +263,8 @@ int main ( int argc, char* argv[] )
     // Merge with KMerCounterAccumuator
     for( unsigned int i = 0; i < counterSize; i++ )
     {
-      //std::cout << "kmer counter size " << i << ' ' << KMerCounter[i].size() << std::endl;
       AccumulatorMapType fKMerCounter = flip_map<std::string, size_t>( KMerCounter[i] );
       KMerCounter[i].clear();
-
-      //std::cout << "Flipped kmer counter size " << fKMerCounter.size() << std::endl;
 
       // Retain iTopCount elements;
       AccumulatorMapIteratorType it = fKMerCounter.begin();
@@ -301,7 +280,7 @@ int main ( int argc, char* argv[] )
         ++it;
       }
      fKMerCounter.erase( it, fKMerCounter.end() );
-     //std::cout << "Flipped kmer counter size " << fKMerCounter.size() << std::endl;
+
 
      // Add to KMerCounterAccumulator and delete kMerCounter
       for ( it = fKMerCounter.begin(); it != fKMerCounter.end(); ++it)
