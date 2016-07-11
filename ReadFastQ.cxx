@@ -40,8 +40,8 @@
 #include "itkTimeProbe.h"
 
 
-// Multipass algorithm that exhaustively searches the k-mer space using available
-// computer memory with optimal time.
+// Multipass algorithm that exhaustively searches the k-mer space
+// using available computer memory with optimal time.
 // Each k-mer encountered is broken down into two prefixes and one suffix.
 // The first prefix is explored in a single pass through the data.
 // The second prefix is an index into std::map array.
@@ -53,15 +53,13 @@
 std::string GetString( size_t val, unsigned int kMerSize )
 {
   std::string s;
-  s.reserve( kMerSize );
+  s.resize( kMerSize );
 
   size_t rem;
 
   for( unsigned int i = 0; i < kMerSize; i++ )
   {
     rem = val%4;
-    val = val/4;
-
     switch( rem )
     {
       case 0 :
@@ -77,6 +75,7 @@ std::string GetString( size_t val, unsigned int kMerSize )
         s.insert( kMerSize-1-i, 1, 'T' );
         break;
     }
+    val = val/4;
   }
 
   return s;
@@ -127,9 +126,9 @@ std::pair<B,A> flip_pair(const std::pair<A,B> &p)
 
 // Function to flip a std::map to a std::multimap
 template<typename A, typename B>
-std::multimap<B,A> flip_map(const std::map<A,B> &src)
+std::multimap< B, A, std::greater<B> > flip_map(const std::map<A,B> &src)
 {
-    std::multimap<B,A> dst;
+    std::multimap<B,A, std::greater<B> > dst;
     std::transform(src.begin(), src.end(), std::inserter(dst, dst.begin()),
                    flip_pair<A,B>);
     return dst;
@@ -145,13 +144,13 @@ int main ( int argc, char* argv[] )
   if ( argc < 4 )
   {
     std::cout << "Usage: " << std::endl;
-    std::cout << argv[0] << " iFilename iKMerSize iTopCount" << std::endl;
+    std::cout << argv[0] << " iFilename iKMerSize iTopCount <PassLength> <KMerPrefixLength>" << std::endl;
     return EXIT_FAILURE;
   }
 
   typedef std::map<std::string, size_t> KMerMapType;
   typedef KMerMapType::iterator KMerMapIteratorType;
-  typedef std::multimap<size_t, std::string> AccumulatorMapType;
+  typedef std::multimap<size_t, std::string, std::greater< size_t > > AccumulatorMapType;
   typedef AccumulatorMapType::iterator AccumulatorMapIteratorType;
 
   // User-input parameter for k-mer length
@@ -174,22 +173,36 @@ int main ( int argc, char* argv[] )
   // Prefix length to be explored in each pass of the data
   // Determine this from computer memory available and file size
   // Pass is 0 for small file sizes and large memories
-  // 2 is suitable for file sizes of 15 GB and computer memory of 16 GB
-  unsigned int PrefixLengthInPass = 2;
+  // 2 is suitable for file sizes of 15 GB and computer memory of 10 GB
+  unsigned int PassLength = 2;
+  if ( argc > 4 )
+  {
+    PassLength = atoi( argv[4] );
+  }
 
   // Detemine prefix length and suffix length
-  unsigned int kMerSizePrefix = 0.5*(iKMerSize - PrefixLengthInPass);
-  unsigned int kMerSizeSuffix = iKMerSize - PrefixLengthInPass - kMerSizePrefix;
+  unsigned int kMerSizePrefix = 0.5*(iKMerSize - PassLength);
+  if ( argc > 5 )
+  {
+    kMerSizePrefix = atoi( argv[5] );
+  }
+
+  unsigned int kMerSizeSuffix = iKMerSize - PassLength - kMerSizePrefix;
+
+  //std::cout << "kMerSizePrefix: " << kMerSizePrefix << std::endl;
+  //std::cout << "kMerSizeSuffix: " << kMerSizeSuffix << std::endl;
 
   size_t counterSize(1);
   for( unsigned int j = 0; j < kMerSizePrefix; j++ )
   {
     counterSize *= 4;
   }
+  //std::cout << "Prefix size " << counterSize << std::endl;
 
   size_t index;
-  std::string line;
+  std::string line, kMer, prefix, suffix, passprefix;
   std::fstream inFile( argv[1], std::ios::in );
+  unsigned int len, p;
 
   if( !inFile )
   {
@@ -199,18 +212,21 @@ int main ( int argc, char* argv[] )
 
   AccumulatorMapType KMerCounterAccumulator;
 
-  unsigned int len;
   unsigned int numOfPasses(1);
-  for( unsigned int j = 0; j < PrefixLengthInPass; j++ )
+  for( unsigned int j = 0; j < PassLength; j++ )
   {
     numOfPasses *= 4;
   }
+  //std::cout << "Number of passes " << numOfPasses << std::endl;
 
   for( unsigned int pass = 0; pass < numOfPasses; pass++ )
   {
+    //std::cout << "Pass: " << pass << std::endl;
+
     // Initialize an array of k-mers
     KMerMapType *KMerCounter;
     KMerCounter = new KMerMapType[ counterSize ];
+
     size_t readCounter(0);
     while( !inFile.eof() )
     {
@@ -230,13 +246,22 @@ int main ( int argc, char* argv[] )
       if ( len >= iKMerSize )
       {
         // Extract k-mers and insert into the appropriate std::map
-        for( unsigned int i = 0; i < len - iKMerSize; i++ )
+        for( unsigned int i = 0; i < len-iKMerSize+1; i++ )
         {
+          kMer = line.substr( i, iKMerSize );
+          passprefix = kMer.substr( 0, PassLength );
+          p =  GetIndex( passprefix, PassLength );
+
           //KMer km( line.substr( i, iKMerSize) );
-          if ( GetIndex(line.substr( i, PrefixLengthInPass), PrefixLengthInPass) == pass )
+          if ( p == pass )
           {
-            index = GetIndex( line.substr( i+PrefixLengthInPass, kMerSizePrefix), kMerSizePrefix );
-            KMerCounter[index][ line.substr( i+PrefixLengthInPass+kMerSizePrefix, kMerSizeSuffix) ]++;//km
+            prefix = kMer.substr( PassLength, kMerSizePrefix);
+            index = GetIndex( prefix, kMerSizePrefix );
+            suffix = kMer.substr( PassLength+kMerSizePrefix, kMerSizeSuffix);
+//            std::cout << i << " Kmer " << kMer << ' ' << passprefix << ' ' <<
+//                         p << ' ' << prefix << ' ' << index << ' ' << suffix << std::endl;
+
+            KMerCounter[index][suffix]++;//km
             //std::cout << km.GetNTide() << ' ' << KMerCounter.size() << std::endl;
           }
         }
@@ -254,14 +279,16 @@ int main ( int argc, char* argv[] )
 
     // Flip KMerCounters into a multimap
     // Merge with KMerCounterAccumuator
-    for(unsigned int i = 0; i < counterSize; i++)
+    for( unsigned int i = 0; i < counterSize; i++ )
     {
+      //std::cout << "kmer counter size " << i << ' ' << KMerCounter[i].size() << std::endl;
       AccumulatorMapType fKMerCounter = flip_map<std::string, size_t>( KMerCounter[i] );
       KMerCounter[i].clear();
 
+      //std::cout << "Flipped kmer counter size " << fKMerCounter.size() << std::endl;
+
       // Retain iTopCount elements;
       AccumulatorMapIteratorType it = fKMerCounter.begin();
-      unsigned int count = 0;
       unsigned countLimit = iTopCount;
 
       if ( countLimit > fKMerCounter.size() )
@@ -269,28 +296,27 @@ int main ( int argc, char* argv[] )
         countLimit = fKMerCounter.size();
       }
 
-      while( count < countLimit )
+      for( unsigned int count = 0; count < countLimit; count++ )
       {
-        count++;
         ++it;
       }
      fKMerCounter.erase( it, fKMerCounter.end() );
-
-     std::string kmer = GetString( pass, PrefixLengthInPass ) +
-                        GetString( counterSize, kMerSizePrefix );
+     //std::cout << "Flipped kmer counter size " << fKMerCounter.size() << std::endl;
 
      // Add to KMerCounterAccumulator and delete kMerCounter
-      for (it=fKMerCounter.begin(); it!=fKMerCounter.end(); ++it)
+      for ( it = fKMerCounter.begin(); it != fKMerCounter.end(); ++it)
       {
-        kmer += (*it).second;
-        KMerCounterAccumulator.insert( std::make_pair( (*it).first, kmer ) );
+        kMer = GetString( pass, PassLength ) +
+                           GetString( i, kMerSizePrefix ) +
+                           (*it).second;
+        KMerCounterAccumulator.insert( std::make_pair( (*it).first, kMer ) );
       }
       fKMerCounter.clear();
     }
 
+    delete[] KMerCounter;
+
     // Accumulate only the iTopCount values
-    AccumulatorMapIteratorType it = KMerCounterAccumulator.begin();
-    unsigned int count = 0;
     unsigned int countLimit = iTopCount;
 
     if ( countLimit > KMerCounterAccumulator.size() )
@@ -298,14 +324,12 @@ int main ( int argc, char* argv[] )
       countLimit = KMerCounterAccumulator.size();
     }
 
-    while( count < countLimit )
+    AccumulatorMapIteratorType it = KMerCounterAccumulator.begin();
+    for( unsigned int count = 0; count < countLimit; count++ )
     {
-      count++;
       ++it;
     }
     KMerCounterAccumulator.erase( it, KMerCounterAccumulator.end() );
-
-    delete[] KMerCounter;
 
     // Reset file stream to beginning
     inFile.clear();
@@ -315,6 +339,7 @@ int main ( int argc, char* argv[] )
 
 
   // Write out the top 25 k-mers
+  std::cout << "Print accumulator size " << std::endl;
   AccumulatorMapIteratorType it = KMerCounterAccumulator.begin();
   while ( it != KMerCounterAccumulator.end() )
   {
