@@ -145,6 +145,7 @@ int main ( int argc, char* argv[] )
   {
     std::cout << "Usage: " << std::endl;
     std::cout << argv[0] << " iFilename iKMerSize iTopCount <PassLength> <KMerPrefixLength>" << std::endl;
+    std::cout << std::endl << "Last two parameters are optional" << std::endl;
     return EXIT_FAILURE;
   }
 
@@ -175,13 +176,34 @@ int main ( int argc, char* argv[] )
   // Pass is 0 for small file sizes and large memories
   // 2 is suitable for file sizes of 15 GB and computer memory of 10 GB
   unsigned int PassLength = 2;
+  unsigned int kMerSizePrefix = 0.5*(iKMerSize - PassLength);
+
+  if ( iKMerSize <= 5 )
+  {
+    PassLength = 0;
+    kMerSizePrefix = 0;
+  }
+  else if ( ( iKMerSize > 5 ) && ( iKMerSize <= 16 ) )
+  {
+    PassLength = 0;
+    kMerSizePrefix = iKMerSize-1;
+  }
+  else if ( ( iKMerSize > 16 ) && ( iKMerSize <= 25 ) )
+  {
+    PassLength = 1;
+    kMerSizePrefix = 14;
+  }
+  else
+  {
+    PassLength = 2;
+    kMerSizePrefix = 14;
+  }
+
   if ( argc > 4 )
   {
     PassLength = atoi( argv[4] );
   }
 
-  // Detemine prefix length
-  unsigned int kMerSizePrefix = 0.5*(iKMerSize - PassLength);
   if ( argc > 5 )
   {
     kMerSizePrefix = atoi( argv[5] );
@@ -215,7 +237,7 @@ int main ( int argc, char* argv[] )
 
   for( unsigned int pass = 0; pass < numOfPasses; pass++ )
   {
-    std::cout << "Pass ID: " << pass << " of " << numOfPasses << std::endl;
+    std::cout << "Pass ID: " << pass << " of " << numOfPasses-1 << std::endl;
 
     // Initialize an array of k-mers
     KMerMapType *KMerCounter;
