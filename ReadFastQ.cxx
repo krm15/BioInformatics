@@ -215,6 +215,8 @@ int main ( int argc, char* argv[] )
 
   for( unsigned int pass = 0; pass < numOfPasses; pass++ )
   {
+    std::cout << "Pass ID: " << pass << " of " << numOfPasses << std::endl;
+
     // Initialize an array of k-mers
     KMerMapType *KMerCounter;
     KMerCounter = new KMerMapType[ counterSize ];
@@ -222,6 +224,11 @@ int main ( int argc, char* argv[] )
     size_t readCounter(0);
     while( !inFile.eof() )
     {
+      if ( readCounter%100000 == 0 )
+      {
+        std::cout << "Finished reading " << readCounter/100000 << "K lines" << std::endl;
+      }
+
       // Read in first two lines
       std::getline(inFile, line);
 
