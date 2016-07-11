@@ -168,8 +168,6 @@ int main ( int argc, char* argv[] )
   // User-input parameter for number of k-mer candidates
   unsigned int iTopCount = atoi( argv[3] );
 
-  float FileSizeInMB = filesize( argv[1] )/1000000;
-
   if ( iKMerSize == 0 )
   {
     std::cout << "K-Mer size needs to be larger than 0" << std::endl;
@@ -187,6 +185,9 @@ int main ( int argc, char* argv[] )
   unsigned int PassLength = 2;
   unsigned int kMerSizePrefix = 0.5*(iKMerSize - PassLength);
 
+  float FileSizeInMB = filesize( argv[1] )/1000000;
+  std::cout << "File size in MB: " << FileSizeInMB << std::endl;
+
   if ( iKMerSize <= 5 )
   {
     PassLength = 0;
@@ -197,22 +198,17 @@ int main ( int argc, char* argv[] )
     PassLength = 0;
     kMerSizePrefix = iKMerSize-1;
   }
-  else if ( ( iKMerSize > 16 ) && ( iKMerSize <= 25 ) )
-  {
-    kMerSizePrefix = 14;
-  }
   else
   {
     kMerSizePrefix = 14;
-  }
-
-  if ( FileSizeInMB <= 5000 )
-  {
-        PassLength = 0;
-  }
-  else if ( ( FileSizeInMB > 5000 ) && ( FileSizeInMB <= 10000 ) )
-  {
-        PassLength = 1;
+    if ( FileSizeInMB <= 5000 )
+    {
+      PassLength = 0;
+    }
+    else if ( ( FileSizeInMB > 5000 ) && ( FileSizeInMB <= 10000 ) )
+    {
+      PassLength = 1;
+    }
   }
 
   if ( argc > 4 )
@@ -226,6 +222,12 @@ int main ( int argc, char* argv[] )
   }
 
   unsigned int kMerSizeSuffix = iKMerSize - PassLength - kMerSizePrefix;
+
+
+  std::cout << "K-mer size: " << iKMerSize << std::endl;
+  std::cout << "Pass length: " << PassLength << std::endl;
+  std::cout << "Prefix length: " << kMerSizePrefix << std::endl;
+  std::cout << "Suffix length: " << kMerSizeSuffix << std::endl << std::endl;
 
   size_t counterSize(1);
   for( unsigned int j = 0; j < kMerSizePrefix; j++ )
