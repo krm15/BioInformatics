@@ -82,13 +82,14 @@ std::string GetString( size_t val, unsigned int kMerSize )
 }
 
 // Convert a string to an value in base-4
-size_t GetIndex( std::string kmer, unsigned int kMerSize )
+void GetIndex( std::string& kmer, unsigned int& kMerSize, size_t& s )
 {
-  size_t s = 0;
+  s = 0;
+  bool newChar = false;
   unsigned int val;
   for( unsigned int i = 0; i < kMerSize; i++ )
   {
-    switch(kmer[i])
+    switch( kmer[i] )
     {
       case 'A' :
         val = 0;
@@ -104,6 +105,7 @@ size_t GetIndex( std::string kmer, unsigned int kMerSize )
         break;
       default :
         val = 0;
+        newChar = true;
     }
 
     size_t power(1);
@@ -113,9 +115,8 @@ size_t GetIndex( std::string kmer, unsigned int kMerSize )
     }
     s += power * val;
   }
-
-  return s;
 }
+
 
 // Function to flip std::pair
 template<typename A, typename B>
@@ -235,9 +236,9 @@ int main ( int argc, char* argv[] )
     counterSize *= 4;
   }
 
-  size_t index;
+  size_t index, p;
   std::string line, kMer, prefix, suffix, passprefix;
-  unsigned int len, p;
+  unsigned int len;
   AccumulatorMapType KMerCounterAccumulator;
 
   std::fstream inFile( argv[1], std::ios::in );
@@ -283,15 +284,18 @@ int main ( int argc, char* argv[] )
         for( unsigned int i = 0; i < len-iKMerSize+1; i++ )
         {
           kMer = line.substr( i, iKMerSize );
-          passprefix = kMer.substr( 0, PassLength );
-          p =  GetIndex( passprefix, PassLength );
-
-          if ( p == pass )
+          if ( kMer.find('N') == std::string::npos )
           {
-            prefix = kMer.substr( PassLength, kMerSizePrefix);
-            index = GetIndex( prefix, kMerSizePrefix );
-            suffix = kMer.substr( PassLength+kMerSizePrefix, kMerSizeSuffix);
-            KMerCounter[index][suffix]++;
+            passprefix = kMer.substr( 0, PassLength );
+            GetIndex( passprefix, PassLength, p );
+
+            if ( p == pass )
+            {
+              prefix = kMer.substr( PassLength, kMerSizePrefix);
+              GetIndex( prefix, kMerSizePrefix, index );
+              suffix = kMer.substr( PassLength+kMerSizePrefix, kMerSizeSuffix);
+              KMerCounter[index][suffix]++;
+            }
           }
         }
       }
