@@ -32,13 +32,13 @@
 
 =========================================================================*/
 #include "KMerSource.h"
-#include <itkVector.h>
 #include <fstream>
 #include <string>
 #include <sstream>
 #include <cmath>
-#include "itkTimeProbe.h"
-
+#include <vector>
+#include <map>
+#include <ctime>
 
 // Multipass algorithm that exhaustively searches the k-mer space
 // using available computer memory with optimal time.
@@ -146,10 +146,6 @@ std::ifstream::pos_type filesize(const char* filename)
 
 int main ( int argc, char* argv[] )
 {
-  // Start timer to measure performance
-  itk::TimeProbe cputimer;
-  cputimer.Start();
-
   if ( argc < 4 )
   {
     std::cout << "Usage: " << std::endl;
@@ -157,6 +153,9 @@ int main ( int argc, char* argv[] )
     std::cout << std::endl << "Last two parameters are optional" << std::endl;
     return EXIT_FAILURE;
   }
+
+  // Begin clock
+  clock_t begin = clock();
 
   typedef std::map<std::string, size_t> KMerMapType;
   typedef KMerMapType::iterator KMerMapIteratorType;
@@ -377,8 +376,9 @@ int main ( int argc, char* argv[] )
     ++it;
   }
 
-  cputimer.Stop();
-  std::cout << "K-mer extraction took " << cputimer.GetMean() << " seconds" << std::endl;
+  clock_t end = clock();
+  double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+  std::cout << "K-mer extraction took " << elapsed_secs << " seconds" << std::endl;
 
   return EXIT_SUCCESS;
 }
